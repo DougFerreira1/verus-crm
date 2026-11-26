@@ -1,0 +1,171 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String    @default("user")
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  color     String   @default("#3b82f6")
+  createdAt DateTime @default(now())
+  leads     Lead[]
+}
+
+model Lead {
+  id              String    @id @default(cuid())
+  name            String
+  phone           String    @unique
+  email           String?
+  stage           String    @default("novo_lead")
+  origin          String    @default("whatsapp")
+  autoMoved       Boolean   @default(false)
+  aiHandled       Boolean   @default(true)
+  tagId           String?
+  tag             Tag?      @relation(fields: [tagId], references: [id])
+  lastMessageAt   DateTime?
+  lastFollowUpAt  DateTime?
+  followUpCount   Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  conversations   Conversation[]
+  appointments    Appointment[]
+
+  @@index([stage])
+  @@index([lastMessageAt])
+  @@index([tagId])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  leadId    String
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  unread    Int       @default(0)
+  lastMsg   String?
+  lastMsgAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@index([leadId])
+  @@index([lastMsgAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  content        String
+  sender         String       @default("lead")
+  status         String       @default("sent")
+  isFromAgent    Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model AgentConfig {
+  id        String   @id @default(cuid())
+  prompt    String   @db.Text
+  model     String   @default("gpt-4o-mini")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WhatsAppConfig {
+  id           String  @id @default(cuid())
+  instanceUrl  String  @default("")
+  instanceName String  @default("")
+  apiToken     String  @default("")
+  connected    Boolean @default(false)
+  provider     String  @default("z-api")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Appointment {
+  id              String    @id @default(cuid())
+  leadId          String
+  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  date            DateTime
+  duration        Int       @default(60)
+  title           String    @default("Reunião")
+  description     String?   @db.Text
+  synced          Boolean   @default(false)
+  googleEventId   String?
+  reminder7dSent  Boolean   @default(false)
+  reminder24hSent Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([leadId])
+  @@index([date])
+}
+
+model GoogleCalendarConfig {
+  id           String  @id @default(cuid())
+  accessToken  String? @db.Text
+  refreshToken String? @db.Text
+  calendarId   String  @default("primary")
+  connected    Boolean @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
